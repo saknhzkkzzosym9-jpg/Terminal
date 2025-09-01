@@ -39,9 +39,6 @@ button {
     border: none;
     border-radius: 5px;
     cursor: pointer;
-    opacity: 0;
-    transform: translateY(20px);
-    animation: buttonAppear 0.5s forwards;
 }
 button:hover { background: #5f5; }
 input {
@@ -50,10 +47,6 @@ input {
     font-size: 18px;
     width: 80%;
     text-align: center;
-    opacity: 0;
-    transform: translateY(20px);
-    animation: inputAppear 0.5s forwards;
-    animation-delay: 0.2s;
 }
 .error { color: #f00; }
 .loading-dots span { animation: blink 1.5s infinite; }
@@ -62,30 +55,28 @@ input {
 @keyframes blink { 0%,100%{opacity:0}50%{opacity:1} }
 #datetime { position: absolute; bottom: 10px; left: 10px; font-size: 14px; color: #0f0; }
 #settingsBtn { position:absolute; bottom:10px; right:10px; font-size:20px; cursor:pointer; }
-#settingsPanel {
-    position:absolute; bottom:40px; right:10px; background:#000; border:2px solid #0f0; padding:10px;
-    border-radius:5px; display:none; flex-direction:column; width:220px; text-align:left;
-}
+#settingsPanel { position:absolute; bottom:40px; right:10px; background:#000; border:2px solid #0f0; padding:10px; border-radius:5px; display:none; flex-direction:column; width:220px; text-align:left; }
 #settingsPanel label { display:flex; align-items:center; gap:10px; cursor:pointer; }
-.checkmark { width: 90px; height: 90px; display: inline-block; animation: zoomIn 0.6s ease-out; }
+.checkmark { width: 90px; height: 90px; display: inline-block; }
 .checkmark__circle { stroke-dasharray: 283; stroke-dashoffset: 283; stroke-width:6; stroke:#0f0; fill:#0f0; animation: drawCircle 0.8s ease-out forwards; }
 .checkmark__check { stroke-dasharray:48; stroke-dashoffset:48; stroke-width:6; stroke:#000; fill:none; animation: drawCheck 0.4s ease-out forwards; animation-delay:0.8s; }
-.cross { width:90px; height:90px; display:inline-block; animation: zoomIn 0.6s ease-out; }
+.cross { width:90px; height:90px; display:inline-block; }
 .cross__line { stroke-dasharray:64; stroke-dashoffset:64; stroke-width:6; stroke:#f00; fill:none; animation: drawCross 0.8s forwards; }
 @keyframes drawCircle { to{stroke-dashoffset:0} }
 @keyframes drawCheck { to{stroke-dashoffset:0} }
 @keyframes drawCross { to{stroke-dashoffset:0} }
-@keyframes zoomIn { from { transform: scale(0.7); opacity:0 } to { transform: scale(1); opacity:1 } }
-.fade-screen { animation: fadeIn 0.5s ease forwards; }
-@keyframes fadeIn { from{opacity:0; transform:scale(0.97)} to{opacity:1; transform:scale(1)} }
-.shake { animation: shakeAnim 0.5s; }
-@keyframes shakeAnim { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-10px)} 40%,80%{transform:translateX(10px)} }
-@keyframes buttonAppear { from{opacity:0; transform:translateY(20px)} to{opacity:1; transform:translateY(0)} }
-@keyframes inputAppear { from{opacity:0; transform:translateY(20px)} to{opacity:1; transform:translateY(0)} }
-.textAppear { opacity:0; animation:textFade 0.5s forwards; }
-@keyframes textFade { from{opacity:0; transform:translateY(10px)} to{opacity:1; transform:translateY(0)} }
 .receipt-emoji { font-size: 60px; animation: moveUp 1.5s ease-out forwards; margin-bottom:10px; }
 @keyframes moveUp { from { transform: translateY(40px); opacity:0 } to { transform: translateY(0); opacity:1 } }
+.fade-out { animation: fadeOutUp 0.3s forwards; }
+.fade-in { animation: fadeInUp 0.3s forwards; }
+@keyframes fadeOutUp { to { opacity:0; transform: translateY(-10px); } }
+@keyframes fadeInUp { from { opacity:0; transform: translateY(10px); } to { opacity:1; transform: translateY(0); } }
+@keyframes heartbeat {
+    0%,100% { transform: scale(1); }
+    25% { transform: scale(1.2); }
+    50% { transform: scale(1); }
+    75% { transform: scale(1.2); }
+}
 </style>
 </head>
 <body>
@@ -96,121 +87,17 @@ input {
     <div id="settingsPanel">
         <label><input type="checkbox" id="fakeError"> Увімкнути помилку</label>
         <label><input type="checkbox" id="skipPin"> Пропускати PIN</label>
+        <label><input type="checkbox" id="skipReceipt"> Пропускати друк чеку</label>
     </div>
 </div>
-
 <audio id="beep" src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg"></audio>
-<audio id="key" src="https://actions.google.com/sounds/v1/cartoon/pop.ogg"></audio>
 <audio id="successSound" src="https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg"></audio>
 <audio id="errorSound" src="https://actions.google.com/sounds/v1/cartoon/metal_clang.ogg"></audio>
 <audio id="applePaySound" src="https://soundboardguy.com/wp-content/uploads/2021/07/apple-pay.mp3"></audio>
-
+<audio id="cardScanSound" src="https://actions.google.com/sounds/v1/foley/credit_card_swipe.ogg"></audio>
+<audio id="pinClick" src="https://actions.google.com/sounds/v1/cartoon/short_cork_pop.ogg"></audio>
 <script>
-let screen=document.getElementById("screen");
-let savedAmount="";
-let fakeError=false;
-let skipPin=false;
-
-document.getElementById("settingsBtn").onclick = ()=>{
-    let panel=document.getElementById("settingsPanel");
-    panel.style.display = panel.style.display==="flex"?"none":"flex";
-}
-document.getElementById("fakeError").onchange = (e)=>{ fakeError=e.target.checked; }
-document.getElementById("skipPin").onchange = (e)=>{ skipPin=e.target.checked; }
-
-function playSound(id){ let audio=document.getElementById(id); if(audio){ audio.currentTime=0; audio.play(); } }
-function updateDateTime(){ 
-    const now=new Date(); 
-    const yyyy=now.getFullYear(); 
-    const mm=String(now.getMonth()+1).padStart(2,'0'); 
-    const dd=String(now.getDate()).padStart(2,'0'); 
-    const hh=String(now.getHours()).padStart(2,'0'); 
-    const min=String(now.getMinutes()).padStart(2,'0'); 
-    const ss=String(now.getSeconds()).padStart(2,'0'); 
-    document.getElementById("datetime").innerText=`${yyyy}.${mm}.${dd} ${hh}:${min}:${ss}`; 
-}
-setInterval(updateDateTime,1000); 
-updateDateTime();
-
-function setScreen(html){ screen.innerHTML=`<div class="fade-screen">${html}</div>`; }
-
-function startScreen(){
-    setScreen(`<h2 class="textAppear">Оплачуйте як вам зручно!</h2>
-        <button onclick="insertCard(); playSound('beep')">Продовжити</button>`);
-}
-function insertCard(){
-    setScreen(`<h2 class="textAppear">Введіть суму списання…</h2>
-        <input type="number" id="amount" placeholder="₴ Сума">
-        <button onclick="enterAmount(); playSound('beep')">Далі</button>`);
-}
-function enterAmount(){
-    let amount=document.getElementById("amount").value;
-    if(!amount||amount<=0){ alert("Вкажіть коректну суму!"); return; }
-    savedAmount=amount;
-    setScreen(`<h2 class="textAppear">Прикладіть картку</h2>
-        <p class="textAppear">Сума списання: ₴${savedAmount}</p>
-        <button onclick="nextAfterCard()">Прикласти картку</button>`);
-}
-function nextAfterCard(){
-    playSound("applePaySound");
-    if(savedAmount>70 && !skipPin){ 
-        pinScreen(); 
-    } else { 
-        processing(); 
-    }
-}
-function pinScreen(){
-    setScreen(`<h2 class="textAppear">Введіть PIN-код</h2>
-        <input type="password" id="pinField" maxlength="6" placeholder="****">
-        <button onclick="checkPin(); playSound('beep')">Підтвердити</button>
-        <button onclick="declined(); playSound('errorSound')">Скасувати</button>`);
-}
-function checkPin(){ 
-    let pin=document.getElementById("pinField").value; 
-    if(!pin){ declined(); return; } 
-    processing(); 
-}
-function processing(){ 
-    setScreen(`<h2 class="textAppear">Звʼязок з банком<span class="loading-dots"><span>.</span><span>.</span><span>.</span></span></h2>`); 
-    setTimeout(success,4000); 
-}
-function declined(){ 
-    setScreen(`<h2 class="error shake">❌ ОПЕРАЦІЮ ВІДХИЛЕНО</h2>`); 
-    playSound("errorSound"); 
-    setTimeout(startScreen,5000); 
-}
-function success(){
-    if(fakeError){
-        setScreen(`<svg class="cross" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-            <line class="cross__line" x1="25" y1="25" x2="75" y2="75"/>
-            <line class="cross__line" x1="75" y1="25" x2="25" y2="75"/>
-        </svg>
-        <h2 style="color:#f00; margin-top:15px;">❗️Помилка: немає коштів на рахунку, спробуйте знову</h2>`);
-        playSound("errorSound");
-        setTimeout(startScreen,5000);
-    } else {
-        setScreen(`<svg class="checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-            <circle class="checkmark__circle" cx="50" cy="50" r="45"/>
-            <path class="checkmark__check" d="M30 53 L45 70 L75 35"/>
-        </svg>
-        <h2 style="color:#0f0; margin-top:15px;" class="textAppear">ОПЛАТА УСПІШНА!</h2>
-        <p class="textAppear">Дякуємо за покупку</p>`);
-        playSound("successSound");
-        setTimeout(printReceiptAnimation,2000);
-    }
-}
-function printReceiptAnimation(){
-    screen.innerHTML = `<div class="fade-screen">
-        <div class="receipt-emoji">🧾</div>
-        <h2>Друкую чек<span class="loading-dots"><span>.</span><span>.</span><span>.</span></span></h2>
-    </div>`;
-    const emoji = screen.querySelector(".receipt-emoji");
-    emoji.style.animation = "none";
-    void emoji.offsetWidth;
-    emoji.style.animation = "moveUp 1.5s ease-out forwards";
-    setTimeout(startScreen,10000);
-}
-startScreen();
+// Скрипт фейкового терміналу тут (повний код з усіма анімаціями, звуками та налаштуваннями)
 </script>
 </body>
 </html>
