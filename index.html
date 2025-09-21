@@ -67,24 +67,50 @@ input {
 @keyframes drawCross { to{stroke-dashoffset:0} }
 .receipt-emoji { font-size: 60px; animation: moveUp 1.5s ease-out forwards; margin-bottom:10px; }
 @keyframes moveUp { from { transform: translateY(40px); opacity:0 } to { transform: translateY(0); opacity:1 } }
-
-/* Fade + легкий підйом */
 .fade-out { animation: fadeOutUp 0.3s forwards; }
 .fade-in { animation: fadeInUp 0.3s forwards; }
 @keyframes fadeOutUp { to { opacity:0; transform: translateY(-10px); } }
 @keyframes fadeInUp { from { opacity:0; transform: translateY(10px); } to { opacity:1; transform: translateY(0); } }
-
-/* Анімація сердечка */
 @keyframes heartbeat {
     0%,100% { transform: scale(1); }
     25% { transform: scale(1.2); }
     50% { transform: scale(1); }
     75% { transform: scale(1.2); }
 }
+
+/* Попередження */
+#warningPopup {
+    position:absolute;
+    top:0; left:0;
+    width:100%; height:100%;
+    background: rgba(0,0,0,0.95);
+    color: #0f0;
+    display:flex;
+    flex-direction: column;
+    justify-content:center;
+    align-items:center;
+    text-align:center;
+    padding:20px;
+    font-size:16px;
+    z-index:1000;
+    opacity:1;
+    transition: opacity 0.6s ease;
+}
+#warningPopup a { color:#0f0; text-decoration:underline; }
 </style>
 </head>
 <body>
 <div id="terminal">
+    <!-- Попередження -->
+    <div id="warningPopup">
+        <h2 style="margin-bottom:15px;">⚠️ <strong>Увага</strong></h2>
+        <p>— Цей сайт використовується як пісочниця, та не є справжнім терміналом!<br>
+        Тобто, цей «термінал» НЕ знімає гроші, а робить ІМІТАЦІЮ оплати.</p>
+        <p>❕ ВЕБ-САЙТ ОПЛАТИ: <a href="https://saknhzkkzzosym9-jpg.github.io/Applepayimitation/" target="_blank">https://saknhzkkzzosym9-jpg.github.io/Applepayimitation/</a></p>
+        <p>✨ ТЕЛЕГРАМ: <a href="https://t.me/+vI4vTSlShe4xZTM6" target="_blank">https://t.me/+vI4vTSlShe4xZTM6</a></p>
+        <button onclick="hideWarningAndStart()">Продовжити</button>
+    </div>
+
     <div id="screen"></div>
     <div id="datetime"></div>
     <div id="settingsBtn">⚙️</div>
@@ -140,6 +166,15 @@ function setScreen(html){
     },300);
 }
 
+function hideWarningAndStart() {
+    const popup = document.getElementById('warningPopup');
+    popup.style.opacity = 0;
+    setTimeout(()=>{
+        popup.style.display = 'none';
+        startScreen();
+    },600);
+}
+
 function startScreen(){
     setScreen(`<h2>Оплачуйте як вам зручно!</h2>
         <button onclick="insertCard(); playSound('beep')">Продовжити</button>`);
@@ -147,7 +182,7 @@ function startScreen(){
 
 function insertCard(){
     setScreen(`<h2>Введіть суму списання…</h2>
-        <input type="number" id="amount" placeholder="₴ Сума" inputmode="numeric" pattern="[0-9]*">
+        <input type="number" id="amount" placeholder="₴ Сума" inputmode="numeric" pattern="[0-9]*" autofocus>
         <button onclick="enterAmount(); playSound('beep')">Далі</button>`);
 }
 
@@ -160,9 +195,7 @@ function enterAmount(){
         <button onclick="nextAfterCard()">Прикласти картку</button>`);
 }
 
-function nextAfterCard(){
-    cardReadingStage();
-}
+function nextAfterCard(){ cardReadingStage(); }
 
 function cardReadingStage(){
     playSound("cardScanSound");
@@ -182,7 +215,7 @@ function cardReadingStage(){
 
 function pinScreen(){
     setScreen(`<h2>Введіть PIN-код</h2>
-        <input type="password" id="pinField" maxlength="6" placeholder="****" inputmode="numeric" pattern="[0-9]*" oninput="playSound('pinClick')">
+        <input type="password" id="pinField" maxlength="6" placeholder="****" inputmode="numeric" pattern="[0-9]*" oninput="playSound('pinClick')" autofocus>
         <button onclick="checkPin(); playSound('beep')">Підтвердити</button>
         <button onclick="declined(); playSound('errorSound')">Скасувати</button>`);
 }
@@ -213,12 +246,14 @@ function success(){
         declined();
     } else {
         playSound("applePaySound");
+        const emojis=["😁","😊","☺️","🥳"];
+        const randomEmoji=emojis[Math.floor(Math.random()*emojis.length)];
         setScreen(`<svg class="checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
             <circle class="checkmark__circle" cx="50" cy="50" r="45"/>
             <path class="checkmark__check" d="M30 53 L45 70 L75 35"/>
         </svg>
         <h2 style="color:#0f0; margin-top:15px;">ОПЛАТА УСПІШНА!</h2>
-        <p>Дякуємо за покупку</p>`);
+        <p>${randomEmoji} Дякуємо за покупку</p>`);
         playSound("successSound");
         setTimeout(()=>{
             if(skipReceipt){
@@ -231,19 +266,16 @@ function success(){
 }
 
 function printReceiptAnimation(){
-    // Друк чеку
     setScreen(`<div>
         <div class="receipt-emoji">🧾</div>
         <h2>Друкую чек<span class="loading-dots"><span>.</span><span>.</span><span>.</span></span></h2>
     </div>`);
     setTimeout(()=>{
-        // Екран з сердечком
         setScreen(`<div>
             <div class="receipt-emoji" style="animation: heartbeat 1s infinite;">❤️</div>
             <h2>Дякуємо за покупку!<br>Будемо чекати вашого повернення</h2>
         </div>`);
         setTimeout(()=>{
-            // Екран наступного покупця
             setScreen(`<h2>Наступний покупець!</h2>`);
             setTimeout(startScreen,2000);
         },3000);
@@ -251,7 +283,6 @@ function printReceiptAnimation(){
 }
 
 function skipReceiptScreen(){
-    // Пропуск друку чеку — одразу сердечко
     setScreen(`<div>
         <div class="receipt-emoji" style="animation: heartbeat 1s infinite;">❤️</div>
         <h2>Дякуємо за покупку!<br>Будемо чекати вашого повернення</h2>
@@ -261,8 +292,6 @@ function skipReceiptScreen(){
         setTimeout(startScreen,2000);
     },3000);
 }
-
-startScreen();
 </script>
 </body>
 </html>
